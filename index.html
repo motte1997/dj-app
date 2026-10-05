@@ -996,13 +996,20 @@ function b64dec(b64){ const s = atob(b64.replace(/\n/g,'')); return new TextDeco
 async function ghApi(method, body){
   const url = 'https://api.github.com/repos/'+encodeURIComponent(gh.owner)+'/'+encodeURIComponent(gh.repo)+'/contents/'+GH_PATH;
   const r = await fetch(url + (method==='GET' ? '?t='+Date.now() : ''), { method,
-    headers:{ 'Authorization':'Bearer '+gh.token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28', 'Cache-Control':'no-cache' },
+    headers:{ 'Authorization':'Bearer '+gh.token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28' },
     body: body ? JSON.stringify(body) : undefined, cache:'no-store' });
   return r;
 }
 async function ghHolen(){
   const r = await ghApi('GET');
-  if(r.status === 404){ ghSha = null; return null; }
+  if(r.status === 404){
+    // 404 = Datei fehlt noch ODER Repo für dieses Token nicht sichtbar -> unterscheiden
+    const rr = await fetch('https://api.github.com/repos/'+encodeURIComponent(gh.owner)+'/'+encodeURIComponent(gh.repo),
+      { headers:{ 'Authorization':'Bearer '+gh.token, 'Accept':'application/vnd.github+json' }, cache:'no-store' });
+    if(rr.status === 401) throw new Error('Token ungültig (HTTP 401) – bitte Token neu kopieren.');
+    if(rr.status === 404) throw new Error('Repo „'+gh.owner+'/'+gh.repo+'“ nicht gefunden. Prüfe Benutzername, Repo-Name und ob das Token für genau dieses Repo freigegeben ist.');
+    ghSha = null; return null;
+  }
   if(r.status === 401 || r.status === 403) throw new Error('Token ungültig oder keine Berechtigung (HTTP '+r.status+')');
   if(!r.ok) throw new Error('GitHub-Fehler '+r.status);
   const j = await r.json(); ghSha = j.sha;
@@ -1039,7 +1046,12 @@ async function syncJetzt(still){
   cloudStatusRender();
 }
 async function ghVerbinden(){
-  const o = $('g_owner').value.trim(), rp = $('g_repo').value.trim(), t = $('g_token').value.trim();
+  // Eingaben bereinigen: volle URLs ("https://github.com/user/repo") auf Benutzer bzw. Repo-Namen kürzen
+  const clean = s => s.trim().replace(/^https?:\/\/(www\.)?github\.com\//i,'').replace(/\.git$/i,'').split('/').filter(Boolean);
+  let o = clean($('g_owner').value)[0] || '', rp = clean($('g_repo').value).pop() || '';
+  const oRaw = clean($('g_owner').value); if(oRaw.length>1 && !rp) rp = oRaw[1];
+  const t = $('g_token').value.trim();
+  $('g_owner').value = o; $('g_repo').value = rp;
   if(!o || !rp || !t){ alert('Bitte Benutzer, Repo-Name und Token eintragen.'); return; }
   gh = { owner:o, repo:rp, token:t }; localStorage.setItem(GH_KEY, JSON.stringify(gh));
   await syncJetzt(false);
