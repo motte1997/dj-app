@@ -32,7 +32,9 @@ main{max-width:1080px;margin:0 auto;padding:22px 16px 60px}
 label{display:block;font-size:.85em;color:var(--muted);margin-bottom:3px;font-weight:600}
 input,select,textarea{width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:.95em;font-family:inherit;background:#fff}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--gold);border-color:var(--gold)}
-textarea{min-height:70px;resize:vertical}
+textarea{min-height:70px;resize:vertical;line-height:1.4}
+#f_musik,#f_sonder{min-height:220px}
+#f_notizen{min-height:120px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
@@ -263,9 +265,11 @@ nav button i{font-style:normal;margin-right:6px}
       <div class="field"><label>Gästezahl (ca.)</label><input type="text" id="f_eGaeste" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="z. B. 80"></div>
     </div>
     <h3>Wünsche &amp; Notizen</h3>
-    <div class="field"><label>Musikwünsche</label><textarea id="f_musik" placeholder="Genres, Playlists, No-Gos …"></textarea></div>
-    <div class="field"><label>Sonderwünsche</label><textarea id="f_sonder" placeholder="Moderation, Spiele, Nebelmaschine, Wunschlieder …"></textarea></div>
-    <div class="field"><label>Interne Notizen (erscheinen nicht auf Angebot/Rechnung)</label><textarea id="f_notizen"></textarea></div>
+    <div class="grid2">
+      <div class="field"><label>Musikwünsche</label><textarea id="f_musik" rows="9" placeholder="Genres, Playlists, No-Gos …"></textarea></div>
+      <div class="field"><label>Sonderwünsche</label><textarea id="f_sonder" rows="9" placeholder="Moderation, Spiele, Nebelmaschine, Wunschlieder …"></textarea></div>
+    </div>
+    <div class="field"><label>Interne Notizen (erscheinen nicht auf Angebot/Rechnung)</label><textarea id="f_notizen" rows="5"></textarea></div>
   </div>
 
   <div class="card">
