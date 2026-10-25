@@ -93,7 +93,26 @@ table.list tr:hover td{background:#faf6ea}
   #printArea,#printArea *{visibility:visible}
   #printArea{display:block;position:absolute;top:0;left:0;width:100%}
   nav,header,main{display:none}
-  .doc{padding:16mm 17mm 14mm;max-width:none}
+  .doc{
+    padding:16mm 17mm 30mm;
+    max-width:none;
+    min-height:0;
+    display:block;
+  }
+  /* Fußzeile aus dem normalen Textfluss nehmen: Sie wird beim Drucken
+     auf jeder Seite am unteren Seitenrand wiederholt. */
+  .doc .docfoot{
+    position:fixed;
+    left:17mm;
+    right:17mm;
+    bottom:8mm;
+    margin-top:0;
+    padding-top:8px;
+    background:#fff;
+    z-index:10;
+    break-inside:avoid;
+    page-break-inside:avoid;
+  }
 }
 .doc{display:flex;flex-direction:column;min-height:297mm;
 font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#22333a;max-width:760px;margin:0 auto;padding:28px 20px;font-size:13px}
