@@ -93,26 +93,7 @@ table.list tr:hover td{background:#faf6ea}
   #printArea,#printArea *{visibility:visible}
   #printArea{display:block;position:absolute;top:0;left:0;width:100%}
   nav,header,main{display:none}
-  .doc{
-    padding:16mm 17mm 30mm;
-    max-width:none;
-    min-height:0;
-    display:block;
-  }
-  /* Fußzeile aus dem normalen Textfluss nehmen: Sie wird beim Drucken
-     auf jeder Seite am unteren Seitenrand wiederholt. */
-  .doc .docfoot{
-    position:fixed;
-    left:17mm;
-    right:17mm;
-    bottom:8mm;
-    margin-top:0;
-    padding-top:8px;
-    background:#fff;
-    z-index:10;
-    break-inside:avoid;
-    page-break-inside:avoid;
-  }
+  .doc{padding:16mm 17mm 14mm;max-width:none}
 }
 .doc{display:flex;flex-direction:column;min-height:297mm;
 font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#22333a;max-width:760px;margin:0 auto;padding:28px 20px;font-size:13px}
@@ -971,7 +952,12 @@ function settingsSpeichern(){
     const v = $(S_FELDER[k]).value;
     db.settings[k] = ['zahlungsziel','angebotGueltig','grund','satz1','satz2','kmFrei','kmSatz','fzSatz','angebotNr','rechnungNr'].includes(k) ? Number(v) : v;
   }
-  save(); alert('Einstellungen gespeichert ✓');
+  // Explizit merken, dass genau diese Einstellungen in GitHub geschrieben werden müssen.
+  // Der Marker bleibt auch nach einem Neuladen erhalten, falls die Synchronisierung fehlschlägt.
+  db.settings.u = Math.max(Date.now(), Number(db.settings.u || 0) + 1);
+  localStorage.setItem(SETTINGS_DIRTY_KEY, '1');
+  save();
+  alert('Einstellungen gespeichert ✓');
 }
 function backupExport(){
   downloadDatei('DJ-Les-Loutres-Backup_'+heute()+'.json', JSON.stringify(db,null,2), 'application/json');
@@ -997,7 +983,7 @@ function downloadDatei(name, inhalt, typ){
   a.download = name; a.click(); URL.revokeObjectURL(a.href);
 }
 // ---------- Synchronisierung über GitHub (privates Daten-Repo, Contents-API) ----------
-const GH_KEY = 'djll_gh', GH_PATH = 'DJ-Les-Loutres-Daten.json';
+const GH_KEY = 'djll_gh', GH_PATH = 'DJ-Les-Loutres-Daten.json', SETTINGS_DIRTY_KEY = 'djll_settings_dirty';
 let gh = (()=>{ try{ return JSON.parse(localStorage.getItem(GH_KEY)) || null; }catch(e){ return null; } })();
 let ghSha = null, syncTimer = null, syncLaeuft = false, syncNochmal = false, dirty = false;
 let seen = {};            // letzter bekannter Inhalt je Datensatz -> erkennt Änderungen
@@ -1085,9 +1071,24 @@ async function syncJetzt(still){
   try{
     for(let i=0;i<4;i++){
       const remote = await ghHolen();
-      if(remote){ stampAenderungen(); db = mergeDb(db, remote); snapshot(); localStorage.setItem(KEY, JSON.stringify(db)); }
-      if(remote && !dirty && JSON.stringify(db) === JSON.stringify(remote)) break;   // nichts zu senden
-      if(await ghSchreiben() === 'ok'){ dirty = false; break; }
+      if(remote){
+        stampAenderungen();
+        // Wenn Einstellungen explizit gespeichert wurden, haben diese Vorrang vor
+        // älteren GitHub-Werten – auch nach Neuladen oder bei einem parallelen Sync.
+        if(localStorage.getItem(SETTINGS_DIRTY_KEY) === '1'){
+          const remoteU = Number((remote.settings || {}).u || 0);
+          db.settings.u = Math.max(Date.now(), Number(db.settings.u || 0) + 1, remoteU + 1);
+        }
+        db = mergeDb(db, remote);
+        snapshot();
+        localStorage.setItem(KEY, JSON.stringify(db));
+      }
+      if(remote && !dirty && localStorage.getItem(SETTINGS_DIRTY_KEY) !== '1' && JSON.stringify(db) === JSON.stringify(remote)) break;   // nichts zu senden
+      if(await ghSchreiben() === 'ok'){
+        dirty = false;
+        localStorage.removeItem(SETTINGS_DIRTY_KEY);
+        break;
+      }
       if(i===3) throw new Error('Konflikt, bitte erneut versuchen');
     }
     allesNeuZeichnen();
