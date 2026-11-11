@@ -184,11 +184,11 @@ nav button i{font-style:normal;margin-right:6px}
 </header>
 <nav>
   <button data-tab="vorgaenge" class="active"><i>📋</i><span>Vorgänge</span></button>
-  <button data-tab="bearbeiten"None><i>📝</i><span>Neue Anfrage</span></button>
-  <button data-tab="umsatz"None><i>💶</i><span>Umsatz</span></button>
-  <button data-tab="statistik"None><i>📊</i><span>Statistik</span></button>
-  <button data-tab="einstellungen"None><i>⚙️</i><span>Einstellungen</span></button>
-  <button data-tab="hilfe"None><i>❓</i><span>Hilfe</span></button>
+  <button data-tab="bearbeiten"><i>📝</i><span>Neue Anfrage</span></button>
+  <button data-tab="umsatz"><i>💶</i><span>Umsatz</span></button>
+  <button data-tab="statistik"><i>📊</i><span>Statistik</span></button>
+  <button data-tab="einstellungen"><i>⚙️</i><span>Einstellungen</span></button>
+  <button data-tab="hilfe"><i>❓</i><span>Hilfe</span></button>
 </nav>
 <main>
 <div id="syncBanner" class="warn hidden" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"></div>
@@ -304,10 +304,12 @@ nav button i{font-style:normal;margin-right:6px}
     <button class="btn ghost" onclick="druckeNotiz()">🗒️ Notizenblatt (PDF)</button>
     <button class="btn gold" onclick="druckeAngebot()">📄 Angebot erstellen (PDF)</button>
     <button class="btn gold" onclick="druckeRechnung()">🧾 Rechnung erstellen (PDF)</button>
+    <button class="btn ghost" onclick="wordAngebot()">📝 Angebot als Word</button>
+    <button class="btn ghost" onclick="wordRechnung()">📝 Rechnung als Word</button>
     <button class="btn ghost hidden" id="btnAngebotReset" onclick="angebotZuruecksetzen()">↩️ Angebot löschen</button>
     <button class="btn ghost hidden" id="btnRechnungReset" onclick="rechnungZuruecksetzen()">↩️ Rechnung löschen</button>
     <button class="btn danger" onclick="loeschen()" id="btnLoeschen" style="float:right">🗑️ Vorgang löschen</button>
-    <div class="hint" style="margin-top:8px">PDF-Export: Im Druckdialog „Als PDF speichern“ wählen (funktioniert auf Mac &amp; Windows). Angebots-/Rechnungsnummern werden automatisch fortlaufend vergeben und bleiben dem Vorgang zugeordnet.</div>
+    <div class="hint" style="margin-top:8px">PDF-Export: Im Druckdialog „Als PDF speichern“ wählen (funktioniert auf Mac &amp; Windows). Angebots-/Rechnungsnummern werden automatisch fortlaufend vergeben und bleiben dem Vorgang zugeordnet. <b>Word-Export:</b> erzeugt eine .docx-Datei, in der Positionen, Texte und Beträge frei änderbar sind (Nummer wird wie beim PDF vergeben; Summen bei Änderungen bitte von Hand anpassen).</div>
   </div>
 </section>
 
@@ -396,6 +398,15 @@ nav button i{font-style:normal;margin-right:6px}
     <div class="hint">Die Grundpauschale deckt ab: Sound- &amp; Lichttechnik, Anfahrt (bis zur Freigrenze), Vorbereitung, Kommunikation, Auf- &amp; Abbau.</div>
   </div>
   <div class="card">
+    <h2>Positionstexte auf Angebot &amp; Rechnung</h2>
+    <div class="field"><label>Text „Grundpauschale“</label><textarea id="s_txtGrund" rows="2"></textarea></div>
+    <div class="field"><label>Text „DJ-Leistung bis 1 Uhr“</label><input type="text" id="s_txtDj1"></div>
+    <div class="field"><label>Text „DJ-Leistung ab 1 Uhr“</label><input type="text" id="s_txtDj2"></div>
+    <div class="hint">Die Zeitangabe hängt die App automatisch an: im Angebot „(nach tatsächlicher Spielzeit)“, in der Rechnung z. B. „(2 Std. × 90,00 €)“. Neue Angebote und Rechnungen übernehmen die Texte beim Erstellen; bereits erstellte Rechnungen bleiben unverändert (Beträge und Texte sind eingefroren).</div>
+    <button class="btn" onclick="settingsSpeichern()">💾 Einstellungen speichern</button>
+    <button class="btn ghost" onclick="textvorlagenStandard()">↩️ Standardtexte</button>
+  </div>
+  <div class="card">
     <h2>Nummernkreise</h2>
     <div class="grid4">
       <div class="field"><label>Nächste Angebotsnr.</label><input type="number" id="s_angebotNr" value="1" min="1"></div>
@@ -455,6 +466,17 @@ const LOGO = document.getElementById('hdrLogo').src;
 { const l=document.createElement('link'); l.rel='apple-touch-icon'; l.href=LOGO; document.head.appendChild(l); }
 const KEY = 'djLesLoutres_v1';
 
+// ---------- Texte der Positionen (in den Einstellungen änderbar) ----------
+const TXT_DEFAULTS = {
+  txtGrund: 'Grundpauschale (Sound- & Lichttechnik, Anfahrt, Vorbereitung, Auf- & Abbau)',
+  txtDj1:   'DJ-Leistung bis 1:00 Uhr',
+  txtDj2:   'DJ-Leistung ab 1:00 Uhr'
+};
+function tx(k){
+  const v = (db.settings || {})[k];
+  return (v && String(v).trim()) ? String(v).trim() : TXT_DEFAULTS[k];
+}
+
 // ---------- Daten ----------
 let db = load();
 function load(){
@@ -508,9 +530,9 @@ function kalkuliere(f){
   const sp = stundenSplit(f.beginn, f.ende);
   const km = Number(f.km)||0, fz = Number(f.fahrtzeit)||0;
   const pos = [];
-  pos.push({text:'Grundpauschale (Sound- & Lichttechnik, Anfahrt, Vorbereitung, Auf- & Abbau)', betrag: Number(st.grund)});
-  if(sp.min90>0) pos.push({text:'DJ-Leistung bis 1:00 Uhr ('+(sp.min90/60).toLocaleString('de-DE')+' Std. × '+eur(st.satz1)+')', betrag: sp.min90/60*st.satz1});
-  if(sp.min150>0) pos.push({text:'DJ-Leistung ab 1:00 Uhr ('+(sp.min150/60).toLocaleString('de-DE')+' Std. × '+eur(st.satz2)+')', betrag: sp.min150/60*st.satz2});
+  pos.push({text: tx('txtGrund'), betrag: Number(st.grund)});
+  if(sp.min90>0) pos.push({text: tx('txtDj1')+' ('+(sp.min90/60).toLocaleString('de-DE')+' Std. × '+eur(st.satz1)+')', betrag: sp.min90/60*st.satz1});
+  if(sp.min150>0) pos.push({text: tx('txtDj2')+' ('+(sp.min150/60).toLocaleString('de-DE')+' Std. × '+eur(st.satz2)+')', betrag: sp.min150/60*st.satz2});
   if(km > st.kmFrei) pos.push({text:'Kilometerpauschale ('+km+' km einfach × '+eur(st.kmSatz)+')', betrag: km*st.kmSatz});
   if(fz > 2) pos.push({text:'Fahrtzeitvergütung ('+Math.ceil(fz-2)+' Std. ab der 3. Stunde × '+eur(st.fzSatz)+')', betrag: Math.ceil(fz-2)*st.fzSatz});
   if((Number(f.extraBetrag)||0) !== 0) pos.push({text: f.extraText||'Zusatzleistung', betrag: Number(f.extraBetrag)});
@@ -731,9 +753,13 @@ function druckeNotiz(){
     '<div class="noteblock"><div class="nb-label">Interne Notizen</div>'+esc(c.notizen||'–')+'</div>'+
     docFuss());
 }
-async function druckeAngebot(){
+// ===== Gemeinsame Datenaufbereitung (PDF + Word) =====
+function adressZeilen(c){
+  return [c.kName, c.kAnsprechpartner, c.kStrasse, c.kAdresse2, c.kOrt].filter(x=>x && String(x).trim());
+}
+async function angebotVorbereiten(){
   await syncJetzt(true);
-  const c = speichern(true); if(!c) return;
+  const c = speichern(true); if(!c) return null;
   const st = db.settings;
   if(!c.angebotNr){
     c.angebotNr = 'A-'+new Date().getFullYear()+'-'+pad3(st.angebotNr);
@@ -741,57 +767,46 @@ async function druckeAngebot(){
     if(c.status==='Anfrage') c.status='Angebot';
     $('f_status').value = c.status; save(); zeigeNummern(c);
   }
-  const gueltig = new Date(); gueltig.setDate(gueltig.getDate()+Number(st.angebotGueltig||14));
-  // Nur Positionen – keine Summen-/Gesamtzeile; Preise dieses Vorgangs
-  const pr = preiseVon(c);
+  return c;
+}
+function angebotDaten(c){
+  const st = db.settings, pr = preiseVon(c);
   const km = Number(c.km)||0, fz = Number(c.fahrtzeit)||0;
-  const fix = [{text:'Grundpauschale (Sound- & Lichttechnik, Anfahrt, Vorbereitung, Auf- & Abbau)', betrag:pr.grund}];
+  const fix = [{text:tx('txtGrund'), betrag:pr.grund}];
   if(km > pr.kmFrei) fix.push({text:'Kilometerpauschale ('+km+' km einfach × '+eur(pr.kmSatz)+')', betrag:km*pr.kmSatz});
   if(fz > 2) fix.push({text:'Fahrtzeitvergütung ('+Math.ceil(fz-2)+' Std. ab der 3. Stunde × '+eur(pr.fzSatz)+')', betrag:Math.ceil(fz-2)*pr.fzSatz});
   if((Number(c.extraBetrag)||0) !== 0) fix.push({text:c.extraText||'Zusatzleistung', betrag:Number(c.extraBetrag)});
   if((Number(c.rabatt)||0) > 0) fix.push({text:'Rabatt', betrag:-Number(c.rabatt)});
   const fixSum = fix.reduce((a,p)=>a+p.betrag,0);
-  let i = 0;
-  let tab = '<table class="pos"><tr><th style="width:30px">Pos.</th><th>Leistung</th><th class="r" style="width:130px">Preis</th></tr>';
-  fix.forEach(p=>{ tab += '<tr><td>'+(++i)+'</td><td>'+esc(p.text)+'</td><td class="r">'+eur(p.betrag)+'</td></tr>'; });
-  tab += '<tr><td>'+(++i)+'</td><td>DJ-Leistung bis 1:00 Uhr (nach tatsächlicher Spielzeit)</td><td class="r">'+eur(pr.satz1)+' / Std.</td></tr>';
-  tab += '<tr><td>'+(++i)+'</td><td>DJ-Leistung ab 1:00 Uhr (nach tatsächlicher Spielzeit)</td><td class="r">'+eur(pr.satz2)+' / Std.</td></tr>';
-  tab += '</table>';
-  // Beispielrechnung: Start- und Endzeit werden in den Einstellungen festgelegt.
-  let beispiel = '';
-  const beispielBeginn = st.beispielBeginn || '19:00';
-  const beispielEnde = st.beispielEnde || '03:00';
-  if(beispielBeginn && beispielEnde){
-    const spBeispiel = stundenSplit(beispielBeginn, beispielEnde);
-    const h90 = spBeispiel.min90/60, h150 = spBeispiel.min150/60;
-    const summeBeispiel = fixSum + h90*pr.satz1 + h150*pr.satz2;
-    beispiel = '<div style="background:#faf6ea;border:1px solid #e3c98f;border-radius:6px;padding:8px 12px;margin-top:4px;font-size:11.5px;color:#444">'+
-      '<b>Beispielrechnung</b> (unverbindlich, Spielzeit '+esc(beispielBeginn)+' – '+esc(beispielEnde)+' Uhr):<br>'+
-      'Pauschalen '+eur(fixSum)+' + '+h90.toLocaleString('de-DE')+' Std. × '+eur(pr.satz1)+' (bis 1 Uhr) + '+
-      h150.toLocaleString('de-DE')+' Std. × '+eur(pr.satz2)+' (ab 1 Uhr) = <b>'+eur(summeBeispiel)+'</b></div>';
-  }
-  drucke(docKopf()+
-    '<div style="display:flex;justify-content:space-between"><div class="addr">'+esc(c.kName)+(c.kAnsprechpartner?'<br>'+esc(c.kAnsprechpartner):'')+'<br>'+esc(c.kStrasse)+(c.kAdresse2?'<br>'+esc(c.kAdresse2):'')+'<br>'+esc(c.kOrt)+'</div>'+
-    '<div class="meta">Angebotsnr.: <b>'+c.angebotNr+'</b><br>Datum: '+dtDE(c.angebotDatum)+'<br>Gültig bis: '+gueltig.toLocaleDateString('de-DE')+'</div></div>'+
-    '<h1 class="doctitle">Angebot</h1>'+
-    '<p>Vielen Dank für Ihre Anfrage! Gerne begleiten wir Ihre Veranstaltung als DJ-Duo:</p>'+
-    '<div class="kv" style="margin:10px 0">'+
-    '<div class="k">Veranstaltung</div><div>'+esc(c.eAnlass||'Veranstaltung')+'</div>'+
-    '<div class="k">Datum</div><div>'+dtDE(c.eDatum)+'</div>'+
-    '<div class="k">Spielzeit</div><div>Start '+esc(c.beginn||'–')+' Uhr bis '+(c.endeOffen ? 'Ende offen' : 'Ende '+esc(c.ende||'–')+' Uhr')+'</div>'+
-    '<div class="k">Ort</div><div>'+esc(c.eOrt)+'</div></div>'+
-    tab + beispiel +
-    '<div class="legal">Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.<br>'+
-    'Dieses Angebot ist freibleibend und gültig bis zum '+gueltig.toLocaleDateString('de-DE')+'. '+
-    'Die DJ-Leistung wird nach der tatsächlichen Spielzeit zu den oben genannten Stundensätzen abgerechnet.</div>'+
-    '<p style="margin-top:20px">Wir freuen uns auf Ihre Veranstaltung!<br><br>Mit musikalischen Grüßen<br><b>'+esc(st.inhaber||st.name)+'</b><br>DJ Les Loutres</p>'+
-    docFuss());
+  const rows = fix.map(p=>({text:p.text, preis:eur(p.betrag)}));
+  rows.push({text:tx('txtDj1')+' (nach tatsächlicher Spielzeit)', preis:eur(pr.satz1)+' / Std.'});
+  rows.push({text:tx('txtDj2')+' (nach tatsächlicher Spielzeit)', preis:eur(pr.satz2)+' / Std.'});
+  // Beispielrechnung: Start-/Endzeit aus den Einstellungen
+  const bB = st.beispielBeginn||'19:00', bE = st.beispielEnde||'03:00';
+  const sp = stundenSplit(bB,bE), h90 = sp.min90/60, h150 = sp.min150/60;
+  const bSum = fixSum + h90*pr.satz1 + h150*pr.satz2;
+  const g = new Date(); g.setDate(g.getDate()+Number(st.angebotGueltig||14));
+  const gueltig = g.toLocaleDateString('de-DE');
+  return {
+    rows,
+    bFett:'Beispielrechnung',
+    bRest:' (unverbindlich, Spielzeit '+bB+' – '+bE+' Uhr):',
+    bZeile:'Pauschalen '+eur(fixSum)+' + '+h90.toLocaleString('de-DE')+' Std. × '+eur(pr.satz1)+' (bis 1 Uhr) + '+h150.toLocaleString('de-DE')+' Std. × '+eur(pr.satz2)+' (ab 1 Uhr) = ',
+    bSumme:eur(bSum),
+    gueltig,
+    zeit:'Start '+(c.beginn||'–')+' Uhr bis '+(c.endeOffen ? 'Ende offen' : 'Ende '+(c.ende||'–')+' Uhr'),
+    intro:'Vielen Dank für Ihre Anfrage! Gerne begleiten wir Ihre Veranstaltung als DJ-Duo:',
+    legal1:'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.',
+    legal2:'Dieses Angebot ist freibleibend und gültig bis zum '+gueltig+'. Die DJ-Leistung wird nach der tatsächlichen Spielzeit zu den oben genannten Stundensätzen abgerechnet.',
+    gruss:['Wir freuen uns auf Ihre Veranstaltung!','Mit musikalischen Grüßen'],
+    name: st.inhaber||st.name||''
+  };
 }
-async function druckeRechnung(){
+async function rechnungVorbereiten(){
   await syncJetzt(true);
-  const c = speichern(true); if(!c) return;
+  const c = speichern(true); if(!c) return null;
   const st = db.settings;
-  if(!st.stnr && !confirm('Achtung: Es ist noch keine Steuernummer in den Einstellungen hinterlegt (Pflichtangabe!). Trotzdem fortfahren?')) return;
+  if(!st.stnr && !confirm('Achtung: Es ist noch keine Steuernummer in den Einstellungen hinterlegt (Pflichtangabe!). Trotzdem fortfahren?')) return null;
   if(!c.rechnungNr){
     c.rechnungNr = 'R-'+new Date().getFullYear()+'-'+pad3(st.rechnungNr);
     st.rechnungNr++; c.rechnungDatum = heute();
@@ -800,22 +815,251 @@ async function druckeRechnung(){
     if(!['Bezahlt','Abgesagt'].includes(c.status)) c.status='Rechnung';
     $('f_status').value = c.status; save(); zeigeNummern(c);
   }
+  return c;
+}
+function rechnungDaten(c){
+  const st = db.settings;
   const pos = c.fixPos || kalkuliere(c).pos;
   const total = c.fixBetrag!=null ? c.fixBetrag : kalkuliere(c).total;
-  const faellig = new Date(c.rechnungDatum+'T00:00:00'); faellig.setDate(faellig.getDate()+Number(st.zahlungsziel||14));
+  const f = new Date(c.rechnungDatum+'T00:00:00'); f.setDate(f.getDate()+Number(st.zahlungsziel||14));
+  return { pos, total, faellig:f.toLocaleDateString('de-DE'),
+    legal1:'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.', name: st.inhaber||st.name||'' };
+}
+
+// ===== PDF (Druckdialog) =====
+async function druckeAngebot(){
+  const c = await angebotVorbereiten(); if(!c) return;
+  const d = angebotDaten(c);
+  let tab = '<table class="pos"><tr><th style="width:30px">Pos.</th><th>Leistung</th><th class="r" style="width:130px">Preis</th></tr>';
+  d.rows.forEach((p,i)=>{ tab += '<tr><td>'+(i+1)+'</td><td>'+esc(p.text)+'</td><td class="r">'+esc(p.preis)+'</td></tr>'; });
+  tab += '</table>';
+  const beispiel = '<div style="background:#faf6ea;border:1px solid #e3c98f;border-radius:6px;padding:8px 12px;margin-top:4px;font-size:11.5px;color:#444">'+
+    '<b>'+esc(d.bFett)+'</b>'+esc(d.bRest)+'<br>'+esc(d.bZeile)+'<b>'+esc(d.bSumme)+'</b></div>';
   drucke(docKopf()+
-    '<div style="display:flex;justify-content:space-between"><div class="addr">'+esc(c.kName)+(c.kAnsprechpartner?'<br>'+esc(c.kAnsprechpartner):'')+'<br>'+esc(c.kStrasse)+(c.kAdresse2?'<br>'+esc(c.kAdresse2):'')+'<br>'+esc(c.kOrt)+'</div>'+
+    '<div style="display:flex;justify-content:space-between"><div class="addr">'+adressZeilen(c).map(x=>esc(x)).join('<br>')+'</div>'+
+    '<div class="meta">Angebotsnr.: <b>'+c.angebotNr+'</b><br>Datum: '+dtDE(c.angebotDatum)+'<br>Gültig bis: '+d.gueltig+'</div></div>'+
+    '<h1 class="doctitle">Angebot</h1>'+
+    '<p>'+esc(d.intro)+'</p>'+
+    '<div class="kv" style="margin:10px 0">'+
+    '<div class="k">Veranstaltung</div><div>'+esc(c.eAnlass||'Veranstaltung')+'</div>'+
+    '<div class="k">Datum</div><div>'+dtDE(c.eDatum)+'</div>'+
+    '<div class="k">Spielzeit</div><div>'+esc(d.zeit)+'</div>'+
+    '<div class="k">Ort</div><div>'+esc(c.eOrt)+'</div></div>'+
+    tab + beispiel +
+    '<div class="legal">'+esc(d.legal1)+'<br>'+esc(d.legal2)+'</div>'+
+    '<p style="margin-top:20px">'+esc(d.gruss[0])+'<br><br>'+esc(d.gruss[1])+'<br><b>'+esc(d.name)+'</b><br>DJ Les Loutres</p>'+
+    docFuss());
+}
+async function druckeRechnung(){
+  const c = await rechnungVorbereiten(); if(!c) return;
+  const st = db.settings, d = rechnungDaten(c);
+  drucke(docKopf()+
+    '<div style="display:flex;justify-content:space-between"><div class="addr">'+adressZeilen(c).map(x=>esc(x)).join('<br>')+'</div>'+
     '<div class="meta">Rechnungsnr.: <b>'+c.rechnungNr+'</b><br>Rechnungsdatum: '+dtDE(c.rechnungDatum)+'<br>Leistungsdatum: '+dtDE(c.eDatum)+'</div></div>'+
     '<h1 class="doctitle">Rechnung</h1>'+
     '<p>für die DJ-Begleitung Ihrer Veranstaltung („'+esc(c.eAnlass||'Veranstaltung')+'“) am '+dtDE(c.eDatum)+' in '+esc(c.eOrt||'–')+':</p>'+
-    posTabelle(pos,total)+
-    '<div class="legal"><b>Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.</b><br>'+
-    'Bitte überweisen Sie den Gesamtbetrag von <b>'+eur(total)+'</b> bis zum <b>'+faellig.toLocaleDateString('de-DE')+'</b> unter Angabe der Rechnungsnummer auf folgendes Konto:<br>'+
+    posTabelle(d.pos,d.total)+
+    '<div class="legal"><b>'+esc(d.legal1)+'</b><br>'+
+    'Bitte überweisen Sie den Gesamtbetrag von <b>'+eur(d.total)+'</b> bis zum <b>'+d.faellig+'</b> unter Angabe der Rechnungsnummer auf folgendes Konto:<br>'+
     esc(st.bank)+' · IBAN: '+esc(st.iban)+'</div>'+
-    '<p style="margin-top:20px">Vielen Dank für Ihr Vertrauen!<br><br>'+esc(st.inhaber||st.name)+'<br>DJ Les Loutres</p>'+
+    '<p style="margin-top:20px">Vielen Dank für Ihr Vertrauen!<br><br>'+esc(d.name)+'<br>DJ Les Loutres</p>'+
     docFuss());
 }
 
+// ===== Word-Export (.docx) – komplett offline, ohne Bibliothek =====
+const CRC_TAB = (()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = (c&1) ? (0xEDB88320^(c>>>1)) : (c>>>1); t[n]=c>>>0; } return t; })();
+function crc32(u8){ let c=0xFFFFFFFF; for(let i=0;i<u8.length;i++) c = CRC_TAB[(c^u8[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function zipStore(files){   // ZIP ohne Kompression (reicht für .docx)
+  const enc = new TextEncoder(), parts = [], cen = []; let off = 0;
+  const u16 = n => [n&255,(n>>>8)&255], u32 = n => [n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255];
+  files.forEach(f=>{
+    const nm = enc.encode(f.name), crc = crc32(f.data), sz = f.data.length;
+    const lh = new Uint8Array([0x50,0x4b,3,4].concat(u16(20),u16(0x0800),u16(0),u16(0),u16(0x21),u32(crc),u32(sz),u32(sz),u16(nm.length),u16(0)));
+    parts.push(lh, nm, f.data);
+    cen.push(new Uint8Array([0x50,0x4b,1,2].concat(u16(20),u16(20),u16(0x0800),u16(0),u16(0),u16(0x21),u32(crc),u32(sz),u32(sz),u16(nm.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(off))), nm);
+    off += lh.length + nm.length + sz;
+  });
+  let cs = 0; cen.forEach(p=>cs+=p.length);
+  const end = new Uint8Array([0x50,0x4b,5,6].concat(u16(0),u16(0),u16(files.length),u16(files.length),u32(cs),u32(off),u16(0)));
+  return new Blob(parts.concat(cen,[end]), {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+}
+const xe = s => String(s==null?'':s).replace(/[&<>]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+const W_NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"';
+const wBR = '<w:r><w:br/></w:r>';
+const wB = (side,sz,color) => '<w:'+side+' w:val="single" w:sz="'+sz+'" w:space="0" w:color="'+color+'"/>';
+function wR(t,o){ o=o||{};
+  const sz = o.sz||21;
+  return '<w:r><w:rPr>'+(o.b?'<w:b/>':'')+'<w:color w:val="'+(o.color||'22333A')+'"/><w:sz w:val="'+sz+'"/><w:szCs w:val="'+sz+'"/></w:rPr><w:t xml:space="preserve">'+xe(t)+'</w:t></w:r>';
+}
+function wP(inner,o){ o=o||{};
+  let pp = '';
+  if(o.before!=null || o.after!=null) pp += '<w:spacing'+(o.before!=null?' w:before="'+o.before+'"':'')+(o.after!=null?' w:after="'+o.after+'"':'')+'/>';
+  if(o.jc) pp += '<w:jc w:val="'+o.jc+'"/>';
+  return '<w:p>'+(pp?'<w:pPr>'+pp+'</w:pPr>':'')+inner+'</w:p>';
+}
+function wTc(inner,w,o){ o=o||{};
+  let pr = '<w:tcW w:w="'+w+'" w:type="dxa"/>';
+  if(o.borders) pr += '<w:tcBorders>'+o.borders+'</w:tcBorders>';
+  if(o.fill) pr += '<w:shd w:val="clear" w:color="auto" w:fill="'+o.fill+'"/>';
+  return '<w:tc><w:tcPr>'+pr+'</w:tcPr>'+inner+'</w:tc>';
+}
+function wTr(cells,o){ o=o||{};
+  return '<w:tr><w:trPr><w:cantSplit/>'+(o.header?'<w:tblHeader/>':'')+'</w:trPr>'+cells.join('')+'</w:tr>';
+}
+function wTbl(rows,widths,o){ o=o||{};
+  const tot = widths.reduce((a,b)=>a+b,0), pv = (o.padV!=null?o.padV:60);
+  return '<w:tbl><w:tblPr><w:tblW w:w="'+tot+'" w:type="dxa"/>'+(o.borders?'<w:tblBorders>'+o.borders+'</w:tblBorders>':'')+
+    '<w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="'+pv+'" w:type="dxa"/><w:left w:w="100" w:type="dxa"/><w:bottom w:w="'+pv+'" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr>'+
+    '<w:tblGrid>'+widths.map(x=>'<w:gridCol w:w="'+x+'"/>').join('')+'</w:tblGrid>'+rows.join('')+'</w:tbl>';
+}
+// Logo aus dem Header lesen (JPEG/PNG, Größe aus Dateikopf)
+let _bild;
+function bildInfo(){
+  if(_bild !== undefined) return _bild;
+  _bild = null;
+  try{
+    const m = /^data:image\/(png|jpeg|jpg);base64,(.+)$/.exec(LOGO); if(!m) return _bild;
+    const bin = atob(m[2]), u8 = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) u8[i] = bin.charCodeAt(i);
+    let w = 1, h = 1;
+    if(m[1]==='png'){
+      w = ((u8[16]<<24)|(u8[17]<<16)|(u8[18]<<8)|u8[19])>>>0; h = ((u8[20]<<24)|(u8[21]<<16)|(u8[22]<<8)|u8[23])>>>0;
+    }else{
+      let i = 2;
+      while(i < u8.length-9){
+        if(u8[i] !== 0xFF){ i++; continue; }
+        const mk = u8[i+1];
+        if(mk>=0xC0 && mk<=0xCF && mk!==0xC4 && mk!==0xC8 && mk!==0xCC){ h = (u8[i+5]<<8)|u8[i+6]; w = (u8[i+7]<<8)|u8[i+8]; break; }
+        i += 2 + ((u8[i+2]<<8)|u8[i+3]);
+      }
+    }
+    _bild = { ext: m[1]==='png' ? 'png' : 'jpeg', data:u8, w:w||1, h:h||1 };
+  }catch(e){ _bild = null; }
+  return _bild;
+}
+function wLogo(){
+  const b = bildInfo(); if(!b) return '';
+  const cy = 860000, cx = Math.round(cy*b.w/b.h);
+  const A = 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"';
+  return '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="'+cx+'" cy="'+cy+'"/><wp:docPr id="1" name="Logo"/>'+
+    '<wp:cNvGraphicFramePr><a:graphicFrameLocks '+A+' noChangeAspect="1"/></wp:cNvGraphicFramePr>'+
+    '<a:graphic '+A+'><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'+
+    '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="0" name="logo"/><pic:cNvPicPr/></pic:nvPicPr>'+
+    '<pic:blipFill><a:blip r:embed="rIdLogo"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>'+
+    '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+cx+'" cy="'+cy+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>'+
+    '</a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
+}
+function wordKopf(){
+  const st = db.settings;
+  const links = wP(wR((st.name||'[Name in Einstellungen eintragen]')+' · '+(st.strasse||'')+' · '+(st.ort||''),{sz:16,color:'666666'}),{before:900,after:0});
+  const rechts = wP(wLogo(),{jc:'right',after:0});
+  return wTbl([wTr([wTc(links,6866),wTc(rechts,3000)])],[6866,3000],{borders:wB('bottom',18,'C9A35A')}) + wP('',{after:120});
+}
+function wordFuss(){
+  const st = db.settings;
+  const sm = lines => wP(lines.map(l=>wR(l,{sz:16,color:'666666'})).join(wBR),{after:0});
+  return wTbl([wTr([
+    wTc(sm([st.name||'',st.strasse||'',st.ort||'']),3300),
+    wTc(sm(['Tel: '+(st.tel||''),'E-Mail: '+(st.mail||''),'Steuernummer: '+(st.stnr||'')]),3300),
+    wTc(sm(['Bank: '+(st.bank||''),'IBAN: '+(st.iban||'')]),3266)
+  ])],[3300,3300,3266],{borders:wB('top',6,'C9A35A')}) + wP('',{after:0});
+}
+function wordAdresseMeta(c,meta){   // meta: [[Label, Wert, fett?], …]
+  const addr = wP(adressZeilen(c).map(l=>wR(l)).join(wBR),{after:0});
+  const mt = wP(meta.map(m=>wR(m[0]+': ')+wR(m[1],{b:!!m[2]})).join(wBR),{jc:'right',after:0});
+  return wTbl([wTr([wTc(addr,5800),wTc(mt,4066)])],[5800,4066]) + wP('',{after:120});
+}
+function wordKV(paare){
+  const rows = paare.map(p=>wTr([wTc(wP(wR(p[0],{b:true,color:'666666'}),{after:0}),2600),wTc(wP(wR(p[1]),{after:0}),7266)]));
+  return wTbl(rows,[2600,7266],{padV:30}) + wP('',{after:80});
+}
+function wordPositionen(rows,sumRow){
+  const W = [700,6866,2300], kopf = {fill:'1E4A52'}, hc = {b:true,color:'F2EAD2'};
+  const hdr = wTr([
+    wTc(wP(wR('Pos.',hc),{after:0}),W[0],kopf),
+    wTc(wP(wR('Leistung',hc),{after:0}),W[1],kopf),
+    wTc(wP(wR(sumRow?'Betrag':'Preis',hc),{after:0,jc:'right'}),W[2],kopf)
+  ],{header:true});
+  const body = rows.map((p,i)=>wTr([
+    wTc(wP(wR(String(i+1)),{after:0}),W[0]),
+    wTc(wP(wR(p.text),{after:0}),W[1]),
+    wTc(wP(wR(p.preis),{after:0,jc:'right'}),W[2])
+  ]));
+  const all = [hdr].concat(body);
+  if(sumRow){
+    const top = {borders:wB('top',12,'C9A35A')}, sc = {b:true,sz:24,color:'1E4A52'};
+    all.push(wTr([
+      wTc(wP('',{after:0}),W[0],top),
+      wTc(wP(wR(sumRow.text,sc),{after:0}),W[1],top),
+      wTc(wP(wR(sumRow.preis,sc),{after:0,jc:'right'}),W[2],top)
+    ]));
+  }
+  return wTbl(all,W,{borders:wB('top',4,'DDDDDD')+wB('bottom',4,'DDDDDD')+wB('insideH',4,'DDDDDD'),padV:80}) + wP('',{after:120});
+}
+function wordBox(d){
+  const inner = wP(wR(d.bFett,{b:true,sz:19})+wR(d.bRest,{sz:19}),{after:40}) + wP(wR(d.bZeile,{sz:19})+wR(d.bSumme,{b:true,sz:19}),{after:0});
+  const bd = ['top','left','bottom','right'].map(s=>wB(s,6,'E3C98F')).join('');
+  return wTbl([wTr([wTc(inner,9866,{fill:'FAF6EA'})])],[9866],{borders:bd,padV:100}) + wP('',{after:120});
+}
+function wordAngebotBody(c){
+  const d = angebotDaten(c);
+  let x = wordKopf() + wordAdresseMeta(c,[['Angebotsnr.',c.angebotNr,true],['Datum',dtDE(c.angebotDatum)],['Gültig bis',d.gueltig]]);
+  x += wP(wR('Angebot',{b:true,sz:40,color:'1E4A52'}),{before:200,after:120});
+  x += wP(wR(d.intro),{after:120});
+  x += wordKV([['Veranstaltung',c.eAnlass||'Veranstaltung'],['Datum',dtDE(c.eDatum)],['Spielzeit',d.zeit],['Ort',c.eOrt||'']]);
+  x += wordPositionen(d.rows,null) + wordBox(d);
+  x += wP(wR(d.legal1,{sz:19}),{after:0}) + wP(wR(d.legal2,{sz:19}),{after:200});
+  x += wP(wR(d.gruss[0]),{after:200}) + wP(wR(d.gruss[1]),{after:0}) + wP(wR(d.name,{b:true}),{after:0}) + wP(wR('DJ Les Loutres'),{after:0});
+  return x;
+}
+function wordRechnungBody(c){
+  const st = db.settings, d = rechnungDaten(c);
+  let x = wordKopf() + wordAdresseMeta(c,[['Rechnungsnr.',c.rechnungNr,true],['Rechnungsdatum',dtDE(c.rechnungDatum)],['Leistungsdatum',dtDE(c.eDatum)]]);
+  x += wP(wR('Rechnung',{b:true,sz:40,color:'1E4A52'}),{before:200,after:120});
+  x += wP(wR('für die DJ-Begleitung Ihrer Veranstaltung („'+(c.eAnlass||'Veranstaltung')+'“) am '+dtDE(c.eDatum)+' in '+(c.eOrt||'–')+':'),{after:120});
+  x += wordPositionen(d.pos.map(p=>({text:p.text,preis:eur(p.betrag)})),{text:'Gesamtbetrag',preis:eur(d.total)});
+  x += wP(wR(d.legal1,{b:true,sz:19}),{after:60});
+  x += wP(wR('Bitte überweisen Sie den Gesamtbetrag von ',{sz:19})+wR(eur(d.total),{b:true,sz:19})+wR(' bis zum ',{sz:19})+wR(d.faellig,{b:true,sz:19})+
+    wR(' unter Angabe der Rechnungsnummer auf folgendes Konto:',{sz:19})+wBR+wR((st.bank||'')+' · IBAN: '+(st.iban||''),{sz:19}),{after:200});
+  x += wP(wR('Vielen Dank für Ihr Vertrauen!'),{after:200}) + wP(wR(d.name),{after:0}) + wP(wR('DJ Les Loutres'),{after:0});
+  return x;
+}
+function wordPaket(bodyXml){
+  const enc = new TextEncoder(), b = bildInfo(), files = [];
+  const add = (n,s) => files.push({name:n, data:(typeof s==='string' ? enc.encode(s) : s)});
+  const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  add('[Content_Types].xml', X+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'+
+    (b?'<Default Extension="'+b.ext+'" ContentType="image/'+b.ext+'"/>':'')+
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'+
+    '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'+
+    '<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>');
+  add('_rels/.rels', X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="'+R+'/officeDocument" Target="word/document.xml"/></Relationships>');
+  add('word/_rels/document.xml.rels', X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdSt" Type="'+R+'/styles" Target="styles.xml"/><Relationship Id="rIdFt" Type="'+R+'/footer" Target="footer1.xml"/>'+
+    (b?'<Relationship Id="rIdLogo" Type="'+R+'/image" Target="media/logo.'+b.ext+'"/>':'')+'</Relationships>');
+  add('word/styles.xml', X+'<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="21"/><w:szCs w:val="21"/><w:lang w:val="de-DE"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="80" w:line="259" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style></w:styles>');
+  add('word/document.xml', X+'<w:document '+W_NS+'><w:body>'+bodyXml+
+    '<w:sectPr><w:footerReference w:type="default" r:id="rIdFt"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="850" w:right="1020" w:bottom="1300" w:left="1020" w:header="400" w:footer="500" w:gutter="0"/></w:sectPr></w:body></w:document>');
+  add('word/footer1.xml', X+'<w:ftr '+W_NS+'>'+wordFuss()+'</w:ftr>');
+  if(b) add('word/media/logo.'+b.ext, b.data);
+  return zipStore(files);
+}
+function wordSpeichern(body,art,nr,c){
+  const blob = wordPaket(body);
+  const sauber = s => String(s||'').replace(/[\\\/:*?"<>|]+/g,'').trim().replace(/\s+/g,'_');
+  const name = art+'_'+sauber(nr)+(c.kName?'_'+sauber(c.kName):'')+'.docx';
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 5000);
+}
+async function wordAngebot(){
+  const c = await angebotVorbereiten(); if(!c) return;
+  wordSpeichern(wordAngebotBody(c),'Angebot',c.angebotNr,c);
+}
+async function wordRechnung(){
+  const c = await rechnungVorbereiten(); if(!c) return;
+  wordSpeichern(wordRechnungBody(c),'Rechnung',c.rechnungNr,c);
+}
 // ---------- Umsatz ----------
 const MONATE=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 function ausgabenListe(){ if(!db.ausgaben) db.ausgaben=[]; return db.ausgaben; }
@@ -944,8 +1188,9 @@ function exportUmsatzCSV(){
 }
 
 // ---------- Einstellungen & Backup ----------
-const S_FELDER={name:'s_name',inhaber:'s_inhaber',strasse:'s_strasse',ort:'s_ort',tel:'s_tel',mail:'s_mail',stnr:'s_stnr',bank:'s_bank',iban:'s_iban',zahlungsziel:'s_zahlungsziel',angebotGueltig:'s_angebotGueltig',beispielBeginn:'s_beispielBeginn',beispielEnde:'s_beispielEnde',grund:'s_grund',satz1:'s_satz1',satz2:'s_satz2',kmFrei:'s_kmFrei',kmSatz:'s_kmSatz',fzSatz:'s_fzSatz',angebotNr:'s_angebotNr',rechnungNr:'s_rechnungNr'};
-const S_DEFAULTS={beispielBeginn:'19:00',beispielEnde:'03:00'};
+const S_FELDER={name:'s_name',inhaber:'s_inhaber',strasse:'s_strasse',ort:'s_ort',tel:'s_tel',mail:'s_mail',stnr:'s_stnr',bank:'s_bank',iban:'s_iban',zahlungsziel:'s_zahlungsziel',angebotGueltig:'s_angebotGueltig',beispielBeginn:'s_beispielBeginn',beispielEnde:'s_beispielEnde',grund:'s_grund',satz1:'s_satz1',satz2:'s_satz2',kmFrei:'s_kmFrei',kmSatz:'s_kmSatz',fzSatz:'s_fzSatz',angebotNr:'s_angebotNr',rechnungNr:'s_rechnungNr',txtGrund:'s_txtGrund',txtDj1:'s_txtDj1',txtDj2:'s_txtDj2'};
+const S_DEFAULTS=Object.assign({beispielBeginn:'19:00',beispielEnde:'03:00'},TXT_DEFAULTS);
+function textvorlagenStandard(){ for(const k in TXT_DEFAULTS) $(S_FELDER[k]).value = TXT_DEFAULTS[k]; }
 function settingsLaden(){ for(const k in S_FELDER) $(S_FELDER[k]).value = db.settings[k] ?? S_DEFAULTS[k] ?? ''; }
 function settingsSpeichern(){
   for(const k in S_FELDER){
